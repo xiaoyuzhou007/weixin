@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+    <style>
+        .menu_group{
+            width: 100%;
+            display: -webkit-flex; /* Safari */
+            -webkit-align-items: center; /* Safari 7.0+ */
+            display: flex;
+            align-items: center;
+            border: solid 1px #CCCCCC;
+            cursor: pointer;
+            margin-top: 2px;
+        }
+        .menu_group .base{width: 40%; display: inline-block; text-align: center; float: left;}
+        .menu_group .base.cur{background: #DFF0D8;}
+        .menu_group .sub{width: 60%; float: left; text-align: center; border-left: inherit}
+        .menu_group span{display: block; padding: 6px;}
+        .menu_group span.cur{background: #DFF0D8;}
+        .menu_group span.add_sub{display: none;}
+        .menu_group span:not(:last-child){border-bottom: solid 1px #CCCCCC}
+        .show{display: inline-block;}
+
+        .shade{width: 100%; height: 100%; position: absolute; left: 0; top: 0; display: none}
+        .shade .bg{width: 100%; height: 100%; position: relative; background: #333333; opacity: 0.7;}
+    </style>
+    <!-- 最新版本的 Bootstrap 核心 CSS 文件 -->
+    <link rel="stylesheet" href="https://cdn.bootcss.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+    <script src="https://cdn.bootcss.com/jquery/1.12.4/jquery.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <div class="row" style="margin-top: 10px;">
+            <div class="col-md-4">
+                <div class="">
+                    <?php if (array_key_exists('selfmenu_info', $data)): ?>
+                        <?php foreach($data['selfmenu_info']['button'] as $k => $v): ?>
+                        <div class="menu_group">
+                            <div class="base" data-name="<?php echo $v['name']; ?>"><?php echo $v['name']; ?></div>
+
+                            <?php
+                                $subList = $v['sub_button']['list'];
+                                $count = count($subList);
+                            ?>
+                            <div class="sub">
+                                <?php foreach($subList as $i => $sub): ?>
+                                    <span data-name="<?php echo $sub['name']; ?>" data-type="<?php echo $sub['type']; ?>" data-value="<?php if($sub['type'] == 'view'){ echo $sub['url']; } ?>"><?php echo $sub['name']; ?></span>
+                                <?php endforeach; ?>
+
+                                <span class="add_sub <?php if ($count < 5): ?>show<?php endif; ?>" data-type="view">+</span>
+                            </div>
+                            <div style="clear: both"></div>
+
+                        </div>
+                        <?php endforeach; ?>
+
+                        <div class="" style="margin-top: 10px;">
+                            <button id="finish-btn" type="button" class="btn btn-success btn-lg btn-block">完成</button>
+                        </div>
+                    <?php endif; ?>
+                </div>
+            </div>
+
+            <div id="detail-box" class="col-md-8" style="border: 1px solid #CCCCCC; padding: 20px; display: none;">
+                <form class="form-horizontal">
+                    <div class="form-group">
+                        <label for="name" class="col-sm-2 control-label">名称：</label>
+                        <div class="col-sm-10">
+                            <input type="text" class="form-control" id="name" name="name" placeholder="菜单名称">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="col-sm-2 control-label">类型：</label>
+                        <div class="col-sm-10">
+                            <div class="radio-inline">
+                                <label>
+                                    <input id="click" type="radio" name="type" value="click" checked>
+                                    click
+                                </label>
+                            </div>
+                            <div class="radio-inline">
+                                <label>
+                                    <input id="view"  type="radio" name="type" value="view">
+                                    view
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="url" class="col-sm-2 control-label">url：</label>
+                        <div class="col-sm-10">
+                            <input id="url" type="text" class="form-control" name="url">
+                        </div>
+                    </div>
+
+                    <div class="form-group hidden">
+                        <label for="key" class="col-sm-2 control-label">key：</label>
+                        <div class="col-sm-10">
+                            <input id="key" type="text" class="form-control" name="key">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <div class="col-sm-10 col-sm-offset-2">
+                            <button id="sure-btn" type="button" class="btn col-sm-3 btn-primary">确定</button>
+                            <button id="delete-btn" type="button" class="btn col-sm-3 col-sm-offset-1 btn-danger">删除</button>
+                        </div>
+                    </div>
+                </form>
+
+            </div>
+
+            <div id="shade" class="shade">
+                <div class="bg"></div>
+                <div style="position: absolute; top: 50%; left: 50%; color: #ffffff;">更新中。。。</div>
+            </div>
+
+            <form id="menu-form" action="create.php" method="post">
+                <input type="hidden" name="menu" value="">
+            </form>
+        </div>
+    </div>
+
+<script>
+    $(function(){
+        var nameInput  = $('#name'),
+            clickRadio = $('#click'),
+            viewRadio  = $('#view'),
+            urlInput   = $('#url'),
+            keyInput   = $('#key');
+
+        var detailBox  = $('#detail-box');
+        var deleteBtn  = $('#delete-btn');
+
+        $('.base').each(function(){
+            var height = $(this).parent().height() + 'px';
+            $(this).css({height: height, lineHeight: height});
+        });
+
+        // 点击当前已有菜单
+        $('.menu_group').on('click', '.base, .sub>span', function (e) {
+            var This = e.currentTarget;
+            var menuName = $(This).data('name');
+
+            clearStyle();
+            detailBox.is(':hidden') && detailBox.show();
+            $(This).addClass('cur');
+
+            nameInput.val(menuName);
+
+            if ($(This).hasClass('base')){
+                $('.form-group:first').siblings(':not(:last)').hide();
+                deleteBtn.hide();
+            } else {
+                $('.form-group:first').siblings(':not(:last)').show();
+
+                if ($(This).hasClass('add_sub')){
+                    deleteBtn.hide();
+                } else {
+                    deleteBtn.show();
+                }
+
+                var menuType = $(This).data('type');
+                var menuValue = $(This).data('value');
+
+                switch (menuType){
+                    case 'news':
+                    case 'click':
+                        clickRadio.trigger('click');
+                        break;
+                    case 'view':
+                        viewRadio.trigger('click');
+                        urlInput.val(menuValue);
+                        //viewRadio.prop('checked', true).trigger('click');
+                        break;
+                }
+            }
+
+        });
+
+        // 单选按钮选择
+        $('input[name="type"]').on('click', function(){
+            var type = $(this).val();
+
+            switch (type){
+                case 'news':
+                case 'click':
+                    urlInput.parents('.form-group').addClass('hidden');
+                    keyInput.parents('.form-group').removeClass('hidden');
+                    break;
+                case 'view':
+                    urlInput.parents('.form-group').removeClass('hidden');
+                    keyInput.parents('.form-group').addClass('hidden');
+                    break;
+            }
+        });
+
+        // 确定
+        $('#sure-btn').on('click', function () {
+            var menuName = nameInput.val();
+            var currMenu = $('.menu_group .cur');
+
+            if (!menuName.length){
+                alert('菜单名称不能为空');
+                return false;
+            }
+
+
+            if (currMenu.hasClass('base')){
+
+                currMenu.data('name', menuName).text(menuName);
+
+            } else if(currMenu.hasClass('add-base')) {
+
+
+            } else {
+
+                var menuType  = $('input[name="type"]:checked').val(),
+                    menuValue = '';
+
+                switch (menuType){
+                    case 'news':
+                    case 'click':
+                        menuValue = keyInput.val();
+                        break;
+                    case 'view':
+                        menuValue = urlInput.val();
+                        break;
+                }
+
+                if (!menuValue.length){
+                    alert('key或url不能为空');
+                    return false;
+                }
+
+                if (currMenu.hasClass('add_sub')){
+
+                    var spanEl = $('<span></span>').data({
+                        name: menuName,
+                        type: menuType,
+                        value: menuValue
+                    }).text(menuName).addClass('cur');
+
+                    currMenu.before(spanEl).removeClass('cur');
+                    deleteBtn.show();
+                    
+                    if(currMenu.siblings().length >= 5){
+                        currMenu.removeClass('show');
+                    }
+
+                    var height = currMenu.parents('.menu_group').height() + 'px';
+                    currMenu.parent().siblings().css({height: height, lineHeight: height});
+
+                } else {
+                    currMenu.data({name: menuName, type: menuType, value: menuValue}).text(menuName);
+                }
+
+            }
+
+        });
+        
+        // 删除
+        deleteBtn.on('click', function () {
+            var currMenu = $('.menu_group .cur');
+            var height   = currMenu.parents('.menu_group').height() - currMenu.outerHeight() + 'px';
+            var addMenu  = currMenu.siblings('add_sub');
+
+            if (!addMenu.hasClass('show')){
+                addMenu.addClass('show');
+            }
+
+            currMenu.parent().siblings().css({height: height, lineHeight: height});
+            currMenu.remove();
+            detailBox.hide();
+
+        });
+
+        // 完成
+        $('#finish-btn').on('click', function(){
+            var baseEl, subEl, tmp, menuList = {button: []};
+
+            $('.menu_group').each(function(){
+                baseEl = $(this).find('.base');
+                subEl  = $(this).find('.sub span');
+
+                tmp = {name: baseEl.data('name'), sub_button: []};
+
+                subEl.each(function(){
+                    if ($(this).hasClass('add_sub')){ return false; }
+
+                    var menuType = $(this).data('type');
+                    var menuName = $(this).data('name');
+                    var menuValue = $(this).data('value');
+
+                    var obj = {type: menuType, name: menuName};
+
+                    switch (menuType){
+                        case 'click':
+                        case 'news':
+                            obj.key = menuValue;
+                            break;
+                        case 'view':
+                            obj.url = menuValue;
+                            break;
+                    }
+
+                    tmp.sub_button.push(obj)
+                });
+
+                menuList.button.push(tmp);
+            });
+
+            $('input[name="menu"]').val(JSON.stringify(menuList));
+            $('#shade').show();
+            $('#menu-form').submit();
+        });
+
+        function clearStyle(){
+            $('.base').removeClass('cur');
+            $('.sub span').removeClass('cur');
+            urlInput.val('');
+            keyInput.val('');
+        }
+
+    });
+</script>
+
+</body>
+</html>
